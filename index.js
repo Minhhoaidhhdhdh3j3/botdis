@@ -1,3 +1,4 @@
+
 const { Client, Intents } = require('discord.js');
 const express = require('express');
 const axios = require('axios');
@@ -7,16 +8,16 @@ const path = require('path');
 const dotenv = require('dotenv');
 const random = require('random');
 
-// Tải các biến môi trường
+// Load environment variables
 dotenv.config();
 
-// Khởi tạo client Discord
+// Initialize discord client
 const client = new Client({
     intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
 });
 
 const TOKEN = process.env.TOKEN;
-const CHANNEL_ID = process.env.CHANNEL_ID;  // Cung cấp CHANNEL_ID từ biến môi trường
+const CHANNEL_ID = process.env.CHANNEL_ID;  // Set CHANNEL_ID from environment variable
 const OWM_API_KEY = process.env.OWM_API_KEY;
 const RAPID_API_KEY = process.env.RAPID_API_KEY;
 const OCR_API_KEY = process.env.OCR_API_KEY;
@@ -34,7 +35,7 @@ function keepAlive() {
     });
 }
 
-// === OCR API (API cho nhận dạng chữ trong ảnh) ===
+// === OCR API (for image text recognition) ===
 async function ocrSpaceFile(filePath, apiKey = OCR_API_KEY) {
     const formData = new FormData();
     formData.append('apikey', apiKey);
@@ -59,7 +60,7 @@ async function ocrSpaceFile(filePath, apiKey = OCR_API_KEY) {
     }
 }
 
-// === Chuyển văn bản thành giọng nói (TTS) ===
+// === Convert text to speech ===
 function textToSpeech(text, filename = 'tts_output.mp3') {
     const speech = new SpeechSynthesisVoice(text);
     speech.save(path.join(__dirname, filename), (err) => {
@@ -69,7 +70,7 @@ function textToSpeech(text, filename = 'tts_output.mp3') {
     });
 }
 
-// === Lấy thông tin thời tiết ===
+// === Get weather information ===
 async function getWeather(city) {
     try {
         const response = await axios.get(`https://api.openweathermap.org/data/2.5/weather`, {
@@ -81,17 +82,21 @@ async function getWeather(city) {
             },
         });
         const data = response.data;
-        return `🌤 **Thời tiết tại ${city}**:\n` +
-               `Trạng thái: ${data.weather[0].description}\n` +
-               `Nhiệt độ: ${data.main.temp}°C\n` +
-               `Độ ẩm: ${data.main.humidity}%\n` +
+        return `🌤 **Thời tiết tại ${city}**:
+` +
+               `Trạng thái: ${data.weather[0].description}
+` +
+               `Nhiệt độ: ${data.main.temp}°C
+` +
+               `Độ ẩm: ${data.main.humidity}%
+` +
                `Gió: ${data.wind.speed} m/s`;
     } catch (error) {
         return '🚫 Không tìm thấy thông tin thời tiết cho thành phố này!';
     }
 }
 
-// === Nhắc nhở uống nước ====
+// === Reminders ===
 const reminderList = [
     "💧 Nhớ uống nước đi nha, khát thì đừng nhớ bot nha!",
     "🤸 Đứng dậy vươn vai, cho máu lưu thông nào!",
@@ -105,14 +110,14 @@ const usedReminders = [];
 function pickReminder() {
     const remaining = reminderList.filter(reminder => !usedReminders.includes(reminder));
     if (remaining.length === 0) {
-        usedReminders.length = 0;  // Reset used reminders
+        usedReminders.length = 0;
     }
     const reminder = random.choice(remaining);
     usedReminders.push(reminder);
     return reminder;
 }
 
-// === Gửi thông tin theo giờ ====
+// === Running the bot ===
 client.on('ready', () => {
     console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
     setInterval(() => {
@@ -123,7 +128,7 @@ client.on('ready', () => {
             const reminder = pickReminder();
             channel.send(`${reminder} @everyone`);
         }
-    }, 60 * 60 * 1000); // Mỗi giờ một lần
+    }, 60 * 60 * 1000); 
 });
 
 client.on('messageCreate', async (message) => {
@@ -141,51 +146,18 @@ client.on('messageCreate', async (message) => {
         }
     } else if (content.startsWith('.help')) {
         message.channel.send(
-            "📖 **Hướng dẫn sử dụng bot:**\n" +
-            "1. `.tt <tên địa danh>` – Xem thời tiết.\n" +
-            "2. Gửi link TikTok – Bot trả video xoá logo.\n" +
+            "📖 **Hướng dẫn sử dụng bot:**
+" +
+            "1. `.tt <tên địa danh>` – Xem thời tiết.
+" +
+            "2. Gửi link TikTok – Bot trả video xoá logo.
+" +
             "3. `.help` – Xem danh sách lệnh."
         );
     } else if (content.startsWith('.đ')) {
         message.channel.send("💧 Nhớ uống nước đi nha, khát thì đừng nhớ bot nha!");
-    } else if (content.includes('tiktok.com')) {
-        // Tích hợp TikTok logic (tương tự Python)
-    }
-
-    // Xử lý ảnh gửi lên
-    if (message.attachments.size > 0) {
-        for (const attachment of message.attachments.values()) {
-            if (['png', 'jpg', 'jpeg', 'bmp', 'gif'].some(ext => attachment.filename.toLowerCase().endsWith(ext))) {
-                // Tải ảnh về
-                const imgPath = path.join(__dirname, `./temp_${attachment.id}_${attachment.filename}`);
-                await attachment.download(imgPath);
-
-                // Gửi lên OCR
-                const text = await ocrSpaceFile(imgPath);
-
-                if (text) {
-                    // Tạo giọng nói từ text
-                    const audioFile = textToSpeech(text);
-                    if (audioFile) {
-                        await message.channel.send(`📝 Nội dung chữ trong ảnh:\n\`\`\`\n${text}\n\`\`\``);
-                        // Gửi file âm thanh
-                        await message.channel.send({ files: [audioFile] });
-                        fs.unlinkSync(audioFile);
-                    } else {
-                        await message.channel.send("⚠️ Lỗi khi tạo giọng nói!");
-                    }
-                } else {
-                    await message.channel.send("⚠️ Bot không đọc được chữ trong ảnh!");
-                }
-
-                // Xoá ảnh tạm
-                fs.unlinkSync(imgPath);
-                break;
-            }
-        }
     }
 });
 
-// === Chạy bot Discord ===
 keepAlive();
 client.login(TOKEN);
